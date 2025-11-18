@@ -1,0 +1,96 @@
+﻿@{
+    ViewData["Title"] = "MineSweeper PvP";
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>@ViewData["Title"]</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 10px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+            .btn:hover {
+                background: #764ba2;
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            }
+
+        .btn-secondary {
+            background: #48bb78;
+        }
+
+            .btn-secondary:hover {
+                background: #38a169;
+            }
+
+        .welcome {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💣 MineSweeper PvP</h1>
+        <p class="subtitle">Compete with friends in real-time!</p>
+
+        @if (ViewBag.IsLoggedIn)
+        {
+            <div class="welcome">
+                <p>Welcome back, <strong>@ViewBag.Username</strong>!</p>
+            </div>
+            <a href="@Url.Action("Main", "Home")" class="btn">Enter Game Lobby</a>
+            <br />
+            <a href="@Url.Action("Logout", "Account")" class="btn btn-secondary">Logout</a>
+        }
+        else
+        {
+            <a href="@Url.Action("Login", "Account")" class="btn">Login</a>
+            <a href="@Url.Action("Register", "Account")" class="btn btn-secondary">Register</a>
+        }
+    </div>
+</body>
+</html>

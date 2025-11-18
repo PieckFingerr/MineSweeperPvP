@@ -1,0 +1,135 @@
+﻿@{
+    ViewData["Title"] = "Join Room";
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>@ViewData["Title"]</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 500px;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        p {
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 18px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: bold;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+        }
+
+            input[type="text"]:focus {
+                outline: none;
+                border-color: #667eea;
+            }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 10px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+            .btn:hover {
+                background: #764ba2;
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            }
+
+        .btn-secondary {
+            background: #718096;
+        }
+
+            .btn-secondary:hover {
+                background: #4a5568;
+            }
+
+        .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .error {
+            color: #e53e3e;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🚪</div>
+        <h2>Join Game Room</h2>
+        <p>Enter the room code provided by your friend to join their game.</p>
+
+        <form method="post" asp-action="JoinRoom">
+            <div class="form-group">
+                <label for="roomId">Room Code</label>
+                <input type="text" id="roomId" name="roomId" placeholder="Enter 6-digit code" maxlength="6" required />
+            </div>
+
+            <button type="submit" class="btn">Join Room</button>
+
+            @if (ViewData.ModelState.ErrorCount > 0)
+            {
+                <div class="error">@Html.ValidationSummary()</div>
+            }
+        </form>
+
+        <a href="@Url.Action("Main", "Home")" class="btn btn-secondary">Back to Lobby</a>
+    </div>
+</body>
+</html>

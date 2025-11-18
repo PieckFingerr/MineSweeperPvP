@@ -1,0 +1,119 @@
+﻿@{
+    ViewData["Title"] = "Game Lobby";
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>@ViewData["Title"]</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .game-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .option-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+        }
+
+            .option-card:hover {
+                transform: translateY(-5px);
+            }
+
+            .option-card h2 {
+                color: #333;
+                margin-bottom: 15px;
+            }
+
+            .option-card p {
+                color: #666;
+                margin-bottom: 20px;
+            }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+
+            .btn:hover {
+                background: #764ba2;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            }
+
+        .btn-logout {
+            background: #e53e3e;
+            padding: 8px 20px;
+            font-size: 14px;
+        }
+
+            .btn-logout:hover {
+                background: #c53030;
+            }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h2 style="margin: 0;">MineSweeper PvP Lobby</h2>
+                <p style="margin: 5px 0 0 0; color: #666;">Welcome, <strong>@ViewBag.Username</strong></p>
+            </div>
+            <a href="@Url.Action("Logout", "Account")" class="btn btn-logout">Logout</a>
+        </div>
+
+        <div class="game-options">
+            <div class="option-card">
+                <h2>🎮 Create Room</h2>
+                <p>Start a new game room and invite your friend to join</p>
+                <a href="@Url.Action("Create", "Room")" class="btn">Create New Room</a>
+            </div>
+
+            <div class="option-card">
+                <h2>🚪 Join Room</h2>
+                <p>Enter a room code to join an existing game</p>
+                <a href="@Url.Action("Join", "Room")" class="btn">Join Existing Room</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,7 +1,5 @@
 ﻿using System.Collections.Concurrent;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.SignalR;
-
 
 namespace MineSweeperPvP.Hubs
 {
@@ -10,6 +8,9 @@ namespace MineSweeperPvP.Hubs
         // Map roomId -> list of connectionIds (max 2)
         private static ConcurrentDictionary<string, List<string>> RoomConnections = new();
 
+        // Store game boards for each room: roomId -> (player1Board, player2Board)
+        private static ConcurrentDictionary<string, GameBoards> RoomBoards = new();
+
         public override Task OnDisconnectedAsync(Exception? exception)
         {
             foreach (var kv in RoomConnections)
@@ -17,8 +18,8 @@ namespace MineSweeperPvP.Hubs
                 var list = kv.Value;
                 if (list.Remove(Context.ConnectionId))
                 {
-                    // notify other player
-                    Clients.Group(kv.Key).SendAsync("OpponentLeft");
+                    // Notify OTHER players only (exclude the disconnected one)
+                    Clients.GroupExcept(kv.Key, Context.ConnectionId).SendAsync("OpponentLeft");
                 }
             }
             return base.OnDisconnectedAsync(exception);
@@ -46,23 +47,57 @@ namespace MineSweeperPvP.Hubs
             return Task.CompletedTask;
         }
 
+        // When game starts, store the boards
+        public async Task StartGame(string roomId, string player1BoardJson, string player2BoardJson)
+        {
+            var boards = new GameBoards
+            {
+                Player1Board = player1BoardJson,
+                Player2Board = player2BoardJson
+            };
+
+            RoomBoards.AddOrUpdate(roomId, boards, (_, __) => boards);
+
+            // Send boards to both players
+            await Clients.Group(roomId).SendAsync("GameStarted", player1BoardJson, player2BoardJson);
+        }
+
+        // When a player clicks a cell, broadcast to the other player
+        public async Task CellClicked(string roomId, int playerNumber, int row, int col, bool isBomb, int adjacent)
+        {
+            await Clients.OthersInGroup(roomId).SendAsync("OpponentCellClicked", playerNumber, row, col, isBomb, adjacent);
+        }
+
+        // When a player's grid needs to be reset (hit a bomb)
+        public async Task GridReset(string roomId, int playerNumber, string newBoardJson)
+        {
+            // Update stored board
+            if (RoomBoards.TryGetValue(roomId, out var boards))
+            {
+                if (playerNumber == 1)
+                    boards.Player1Board = newBoardJson;
+                else
+                    boards.Player2Board = newBoardJson;
+            }
+
+            await Clients.Group(roomId).SendAsync("PlayerGridReset", playerNumber, newBoardJson);
+        }
+
         // When a player finishes their grid (revealed all safe cells)
         public async Task PlayerFinished(string roomId, int playerNumber)
         {
-            // notify group
             await Clients.Group(roomId).SendAsync("PlayerFinished", playerNumber);
         }
 
-        // When a player clicks a bomb -> reset that player's grid only
-        public async Task BombClicked(string roomId, string connectionId)
-        {
-            await Clients.Client(connectionId).SendAsync("ResetGrid");
-        }
-
-        // informational messages like sync timer etc
         public Task SendMessageToRoom(string roomId, string message)
         {
             return Clients.Group(roomId).SendAsync("ReceiveMessage", message);
         }
+    }
+
+    public class GameBoards
+    {
+        public string Player1Board { get; set; } = "";
+        public string Player2Board { get; set; } = "";
     }
 }

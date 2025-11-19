@@ -128,17 +128,6 @@
             animation: pulse 2s infinite;
         }
 
-
-        {
-            opacity: 1;
-        }
-
-        50% {
-            opacity: 0.7;
-        }
-
-        }
-
         .grid-container {
             display: inline-block;
             border: 3px solid #333;
@@ -299,6 +288,7 @@
         <div class="header">
             <h1>💣 MineSweeper PvP</h1>
             <div class="room-info">
+
                 <div>Room Code: <span class="room-code">@roomId</span></div>
                 <div style="font-size: 14px; color: #666; margin-top: 5px;">Share this code with your friend!</div>
             </div>
@@ -309,12 +299,14 @@
         <div class="game-area">
             <div class="player-section">
                 <div class="player-label player-1" id="label1">
-                    Player 1 @(playerNumber == 1 ? "(You)" : "")
+                    Player 1 @(playerNumber == 1 ?
+                                        "(You)" : "")
                 </div>
                 <div class="grid-container">
                     <div id="grid-player1"></div>
                 </div>
                 <div class="stats" id="stats1">Safe cells remaining: -</div>
+
             </div>
 
             <div class="player-section">
@@ -322,6 +314,7 @@
                     Player 2 @(playerNumber == 2 ? "(You)" : "")
                 </div>
                 <div class="grid-container">
+
                     <div id="grid-player2"></div>
                 </div>
                 <div class="stats" id="stats2">Safe cells remaining: -</div>
@@ -330,7 +323,8 @@
     </div>
 
     <script>
-        const ROWS = 10, COLS = 10, BOMBS = 15;
+        const ROWS = 10, COLS = 10, BOMBS
+            = 15;
         const roomId = "@roomId";
         const playerNumber = @playerNumber;
         let boardP1 = null;
@@ -343,10 +337,10 @@
                 Array(cols).fill(0).map(() => ({
                     isBomb: false,
                     adj: 0,
+
                     opened: false
                 }))
             );
-
             let placed = 0;
             while (placed < bombs) {
                 const r = Math.floor(Math.random() * rows);
@@ -365,6 +359,7 @@
                     dirs.forEach(d => {
                         const nr = r + d[0], nc = c + d[1];
                         if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && arr[nr][nc].isBomb)
+
                             count++;
                     });
                     arr[r][c].adj = count;
@@ -400,8 +395,13 @@
                     el.dataset.r = r;
                     el.dataset.c = c;
 
+                    // Make cell clickable if it's the player's own grid and game is active
                     if (clickable && !cell.opened && gameStarted && !gameEnded) {
                         el.addEventListener("click", onCellClick);
+                    } else if (!clickable || cell.opened || !gameStarted || gameEnded) {
+                        // Remove pointer cursor for non-clickable cells
+                        el.style.cursor = cell.opened ?
+                            'default' : 'not-allowed';
                     }
 
                     rowDiv.appendChild(el);
@@ -416,7 +416,6 @@
             if (cell.opened) return;
 
             cell.opened = true;
-
             if (cell.adj === 0 && !cell.isBomb) {
                 const dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
                 dirs.forEach(d => openCell(boardState, r + d[0], c + d[1]));
@@ -447,27 +446,36 @@
 
         function onCellClick(e) {
             if (gameEnded) return;
-
             const r = parseInt(this.dataset.r);
             const c = parseInt(this.dataset.c);
             const myBoard = playerNumber === 1 ? boardP1 : boardP2;
+            const myGridId = playerNumber === 1 ? "grid-player1" : "grid-player2";
             const cell = myBoard[r][c];
 
             if (cell.opened) return;
-
             if (cell.isBomb) {
-                // Just reset the grid, continue playing
-                myBoard[r][c].opened = true;
-                renderGrid(playerNumber === 1 ? "grid-player1" : "grid-player2", myBoard, true);
+                // Show bomb explosion
+                cell.opened = true;
+                renderGrid(myGridId, myBoard, true);
 
                 setTimeout(() => {
+                    let newBoard;
+                    // Reset the player's grid
                     if (playerNumber === 1) {
-                        boardP1 = makeBoard(ROWS, COLS, BOMBS);
+                        newBoard = makeBoard(ROWS, COLS, BOMBS);
+                        boardP1 = newBoard;
                         renderGrid("grid-player1", boardP1, true);
                     } else {
-                        boardP2 = makeBoard(ROWS, COLS, BOMBS);
+                        newBoard = makeBoard(ROWS, COLS, BOMBS);
+                        boardP2 = newBoard;
                         renderGrid("grid-player2", boardP2, true);
                     }
+
+                    // FIX: Notify opponent of grid reset
+                    const newBoardJson = JSON.stringify(newBoard);
+                    connection.invoke("GridReset", roomId, playerNumber, newBoardJson)
+                        .catch(err => console.error("Error sending GridReset:", err));
+
                     updateStats();
                     alert("💥 Boom! Your grid has been reset.");
                 }, 500);
@@ -475,12 +483,20 @@
             }
 
             openCell(myBoard, r, c);
-            renderGrid(playerNumber === 1 ? "grid-player1" : "grid-player2", myBoard, true);
-            updateStats();
 
+            // FIX: Notify opponent of cell click
+            const cellState = myBoard[r][c]; // Get the state AFTER openCell
+            connection.invoke("CellClicked", roomId, playerNumber, r, c, cellState.isBomb, cellState.adj)
+                .catch(err => console.error("Error sending CellClicked:", err));
+
+            renderGrid(myGridId, myBoard, true);
+            updateStats();
+            // Check if this player has won
             if (countSafeLeft(myBoard) === 0) {
                 gameEnded = true;
-                connection.invoke("PlayerFinished", roomId, playerNumber);
+                connection.invoke("PlayerFinished", roomId, playerNumber).catch(err => {
+                    console.error("Error sending PlayerFinished:", err);
+                });
                 showWinner(playerNumber);
             }
         }
@@ -490,7 +506,6 @@
             const banner = document.getElementById("winnerBanner");
             const text = document.getElementById("winnerText");
             const subtext = document.getElementById("winnerSubtext");
-
             if (winnerNumber === playerNumber) {
                 text.textContent = "🎉 You Win! 🎉";
                 text.style.color = "#27ae60";
@@ -503,49 +518,63 @@
 
             overlay.classList.add("show");
             banner.classList.add("show");
+            // Disable all cells from both grids
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.style.cursor = 'not-allowed';
+                cell.replaceWith(cell.cloneNode(true)); // Remove all event listeners
+            });
         }
 
         // SignalR
         const connection = new signalR.HubConnectionBuilder()
             .withUrl("/gamehub")
             .build();
-
         connection.start().then(() => {
             console.log("Connected to SignalR");
-            connection.invoke("JoinRoom", roomId);
-        }).catch(err => console.error(err));
-
+            connection.invoke("JoinRoom", roomId).catch(err => {
+                console.error("Error joining room:", err);
+            });
+        }).catch(err => console.error("SignalR connection error:", err));
         connection.on("PlayerJoined", (count) => {
             const status = document.getElementById("status");
             if (count >= 2) {
                 status.textContent = "Both players connected! Ready to start.";
                 status.className = "status ready";
                 document.getElementById("startBtn").disabled = false;
+
             } else {
                 status.textContent = "Waiting for opponent... (" + count + "/2)";
                 status.className = "status waiting";
             }
         });
-
         connection.on("PlayerFinished", (pNumber) => {
+            // Only process if game hasn't already ended
             if (!gameEnded) {
                 gameEnded = true;
                 showWinner(pNumber);
             }
         });
-
         connection.on("OpponentLeft", () => {
-            alert("⚠️ Opponent left the room.");
-            location.href = "@Url.Action("Main", "Home")";
+            // Only redirect if this was intentional (not from our own disconnection)
+            if (connection.state === signalR.HubConnectionState.Connected) {
+                alert("⚠️ Opponent left the room.");
+                location.href = "@Url.Action("Main", "Home")";
+            }
+
         });
 
-        document.getElementById("startBtn").addEventListener("click", () => {
+        // --- NEW SIGNALR HANDLERS ---
+
+        // FIX: Handler for game start (received by the non-starter)
+        connection.on("GameStarted", (p1BoardJson, p2BoardJson) => {
             gameStarted = true;
             gameEnded = false;
 
-            boardP1 = makeBoard(ROWS, COLS, BOMBS);
-            boardP2 = makeBoard(ROWS, COLS, BOMBS);
+            // Parse the received JSON board states
+            boardP1 = JSON.parse(p1BoardJson);
+            boardP2 = JSON.parse(p2BoardJson);
 
+            // Render grids with the correct clickable parameter
             renderGrid("grid-player1", boardP1, playerNumber === 1);
             renderGrid("grid-player2", boardP2, playerNumber === 2);
 
@@ -555,6 +584,81 @@
             document.getElementById("status").className = "status playing";
             document.getElementById("startBtn").style.display = "none";
 
+            // Highlight the player's own grid
+            if (playerNumber === 1) {
+                document.getElementById("label1").classList.add("your-turn");
+            } else {
+                document.getElementById("label2").classList.add("your-turn");
+            }
+        });
+
+        // FIX: Handler for opponent's cell click
+        connection.on("OpponentCellClicked", (oppNumber, r, c, isBomb, adjacent) => {
+            const opponentBoard = oppNumber === 1 ? boardP1 : boardP2;
+            const opponentGridId = oppNumber === 1 ? "grid-player1" : "grid-player2";
+
+            // openCell handles recursive opening
+            openCell(opponentBoard, r, c);
+
+            // Re-render the opponent's grid, which is never clickable for the current user
+            renderGrid(opponentGridId, opponentBoard, false);
+            updateStats();
+        });
+
+        // FIX: Handler for opponent's grid reset
+        connection.on("PlayerGridReset", (pNumber, newBoardJson) => {
+            const newBoard = JSON.parse(newBoardJson);
+
+            if (pNumber === 1) {
+                boardP1 = newBoard;
+                // Render P1's grid with clickable=true for P1, false for P2
+                renderGrid("grid-player1", boardP1, playerNumber === 1);
+            } else {
+                boardP2 = newBoard;
+                // Render P2's grid with clickable=true for P2, false for P1
+                renderGrid("grid-player2", boardP2, playerNumber === 2);
+            }
+            updateStats();
+            alert(`⚠️ Opponent (Player ${pNumber}) hit a bomb and their board was reset!`);
+        });
+
+        // Handle page unload
+        window.addEventListener("beforeunload", () => {
+            if (connection.state === signalR.HubConnectionState.Connected) {
+                connection.invoke("LeaveRoom", roomId).catch(err => {
+                    console.error("Error leaving room:", err);
+                });
+
+            }
+        });
+
+        document.getElementById("startBtn").addEventListener("click", () => {
+            gameStarted = true;
+            gameEnded = false;
+
+            boardP1 = makeBoard(ROWS, COLS, BOMBS);
+            boardP2 = makeBoard(ROWS, COLS, BOMBS);
+
+            // FIX: Broadcast the boards to the opponent
+            const player1BoardJson = JSON.stringify(boardP1);
+            const player2BoardJson = JSON.stringify(boardP2);
+            connection.invoke("StartGame", roomId, player1BoardJson, player2BoardJson)
+                .catch(err => console.error("Error sending StartGame:", err));
+
+            // CRITICAL FIX: Render grids with correct clickable parameter
+            // Player 1 can only
+            // click grid 1, Player 2 can only click grid 2
+            renderGrid("grid-player1", boardP1, playerNumber === 1);
+            renderGrid("grid-player2", boardP2, playerNumber === 2);
+
+            updateStats();
+
+            document.getElementById("status").textContent = "Game in progress!";
+            document.getElementById("status").className = "status playing";
+            document.getElementById("startBtn").style.display = "none";
+
+
+            // Highlight the player's own grid
             if (playerNumber === 1) {
                 document.getElementById("label1").classList.add("your-turn");
             } else {

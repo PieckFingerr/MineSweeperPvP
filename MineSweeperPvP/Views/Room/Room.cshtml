@@ -326,7 +326,7 @@
         const ROWS = 10, COLS = 10, BOMBS
             = 15;
         const roomId = "@roomId";
-        const playerNumber = @playerNumber;
+        let playerNumber = null;
         let boardP1 = null;
         let boardP2 = null;
         let gameStarted = false;
@@ -567,6 +567,8 @@
 
         // FIX: Handler for game start (received by the non-starter)
         connection.on("GameStarted", (p1BoardJson, p2BoardJson) => {
+            if (playerNumber === null) return;
+
             gameStarted = true;
             gameEnded = false;
 
@@ -622,6 +624,10 @@
             alert(`⚠️ Opponent (Player ${pNumber}) hit a bomb and their board was reset!`);
         });
 
+        connection.on("AssignPlayerNumber", (num) => {
+            playerNumber = num;
+        });
+
         // Handle page unload
         window.addEventListener("beforeunload", () => {
             if (connection.state === signalR.HubConnectionState.Connected) {
@@ -633,9 +639,6 @@
         });
 
         document.getElementById("startBtn").addEventListener("click", () => {
-            gameStarted = true;
-            gameEnded = false;
-
             boardP1 = makeBoard(ROWS, COLS, BOMBS);
             boardP2 = makeBoard(ROWS, COLS, BOMBS);
 
@@ -645,25 +648,6 @@
             connection.invoke("StartGame", roomId, player1BoardJson, player2BoardJson)
                 .catch(err => console.error("Error sending StartGame:", err));
 
-            // CRITICAL FIX: Render grids with correct clickable parameter
-            // Player 1 can only
-            // click grid 1, Player 2 can only click grid 2
-            renderGrid("grid-player1", boardP1, playerNumber === 1);
-            renderGrid("grid-player2", boardP2, playerNumber === 2);
-
-            updateStats();
-
-            document.getElementById("status").textContent = "Game in progress!";
-            document.getElementById("status").className = "status playing";
-            document.getElementById("startBtn").style.display = "none";
-
-
-            // Highlight the player's own grid
-            if (playerNumber === 1) {
-                document.getElementById("label1").classList.add("your-turn");
-            } else {
-                document.getElementById("label2").classList.add("your-turn");
-            }
         });
     </script>
 </body>

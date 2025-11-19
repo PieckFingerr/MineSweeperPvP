@@ -28,13 +28,24 @@ namespace MineSweeperPvP.Hubs
         public async Task JoinRoom(string roomId)
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
-            RoomConnections.AddOrUpdate(roomId, _ => new List<string> { Context.ConnectionId }, (_, existing) =>
+
+            RoomConnections.AddOrUpdate(roomId, _ 
+                => new List<string> { Context.ConnectionId }, 
+                (_, existing) =>
             {
-                if (!existing.Contains(Context.ConnectionId)) existing.Add(Context.ConnectionId);
+                if (!existing.Contains(Context.ConnectionId)) 
+                    existing.Add(Context.ConnectionId);
                 return existing;
             });
 
-            await Clients.Group(roomId).SendAsync("PlayerJoined", RoomConnections[roomId].Count);
+            int count = RoomConnections[roomId].Count;
+
+            // Gửi player number cho người mới vào
+            await Clients.Caller.SendAsync("AssignPlayerNumber", count);
+
+            await Clients.Group(roomId).SendAsync("PlayerJoined", count);
+
+            //await Clients.Group(roomId).SendAsync("PlayerJoined", RoomConnections[roomId].Count);
         }
 
         public Task LeaveRoom(string roomId)

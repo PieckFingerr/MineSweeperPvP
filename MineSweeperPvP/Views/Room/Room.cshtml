@@ -565,18 +565,21 @@
 
         // --- NEW SIGNALR HANDLERS ---
 
-        // FIX: Handler for game start (received by the non-starter)
         connection.on("GameStarted", (p1BoardJson, p2BoardJson) => {
             if (playerNumber === null) return;
+
+            // KIỂM TRA nếu đã start rồi thì bỏ qua (trường hợp người start)
+            if (gameStarted) {
+                console.log("Game already started locally, ignoring broadcast");
+                return;
+            }
 
             gameStarted = true;
             gameEnded = false;
 
-            // Parse the received JSON board states
             boardP1 = JSON.parse(p1BoardJson);
             boardP2 = JSON.parse(p2BoardJson);
 
-            // Render grids with the correct clickable parameter
             renderGrid("grid-player1", boardP1, playerNumber === 1);
             renderGrid("grid-player2", boardP2, playerNumber === 2);
 
@@ -586,7 +589,6 @@
             document.getElementById("status").className = "status playing";
             document.getElementById("startBtn").style.display = "none";
 
-            // Highlight the player's own grid
             if (playerNumber === 1) {
                 document.getElementById("label1").classList.add("your-turn");
             } else {
@@ -642,12 +644,35 @@
             boardP1 = makeBoard(ROWS, COLS, BOMBS);
             boardP2 = makeBoard(ROWS, COLS, BOMBS);
 
-            // FIX: Broadcast the boards to the opponent
+            // SET gameStarted TRƯỚC KHI GỬI
+            gameStarted = true;
+            gameEnded = false;
+
+            // RENDER UI NGAY CHO NGƯỜI START
+            renderGrid("grid-player1", boardP1, playerNumber === 1);
+            renderGrid("grid-player2", boardP2, playerNumber === 2);
+            updateStats();
+
+            document.getElementById("status").textContent = "Game in progress!";
+            document.getElementById("status").className = "status playing";
+            document.getElementById("startBtn").style.display = "none";
+
+            // Highlight player's grid
+            if (playerNumber === 1) {
+                document.getElementById("label1").classList.add("your-turn");
+            } else {
+                document.getElementById("label2").classList.add("your-turn");
+            }
+
+            // Broadcast boards to opponent
             const player1BoardJson = JSON.stringify(boardP1);
             const player2BoardJson = JSON.stringify(boardP2);
             connection.invoke("StartGame", roomId, player1BoardJson, player2BoardJson)
-                .catch(err => console.error("Error sending StartGame:", err));
-
+                .catch(err => {
+                    console.error("Error sending StartGame:", err);
+                    alert("Failed to start game. Please try again.");
+                    gameStarted = false;
+                });
         });
     </script>
 </body>

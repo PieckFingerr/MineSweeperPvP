@@ -70,7 +70,8 @@ namespace MineSweeperPvP.Hubs
             RoomBoards.AddOrUpdate(roomId, boards, (_, __) => boards);
 
             // Send boards to both players
-            await Clients.Group(roomId).SendAsync("GameStarted", player1BoardJson, player2BoardJson);
+            //await Clients.Group(roomId).SendAsync("GameStarted", player1BoardJson, player2BoardJson);
+            await Clients.GroupExcept(roomId, Context.ConnectionId).SendAsync("GameStarted", player1BoardJson, player2BoardJson);
         }
 
         // When a player clicks a cell, broadcast to the other player

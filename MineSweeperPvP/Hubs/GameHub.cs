@@ -1,15 +1,23 @@
 ﻿using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
+using MineSweeperPvP.Datas;
+using MineSweeperPvP.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace MineSweeperPvP.Hubs
 {
     public class GameHub : Hub
     {
-        // Map roomId -> list of connectionIds (max 2)
         private static ConcurrentDictionary<string, List<string>> RoomConnections = new();
-
-        // Store game boards for each room: roomId -> (player1Board, player2Board)
         private static ConcurrentDictionary<string, GameBoards> RoomBoards = new();
+
+        private readonly ApplicationDbContext _db;
+
+        // ✅ Inject DbContext để lưu match history
+        public GameHub(ApplicationDbContext db)
+        {
+            _db = db;
+        }
 
         public override Task OnDisconnectedAsync(Exception? exception)
         {
@@ -18,7 +26,6 @@ namespace MineSweeperPvP.Hubs
                 var list = kv.Value;
                 if (list.Remove(Context.ConnectionId))
                 {
-                    // Notify OTHER players only (exclude the disconnected one)
                     Clients.GroupExcept(kv.Key, Context.ConnectionId).SendAsync("OpponentLeft");
                 }
             }
@@ -29,23 +36,18 @@ namespace MineSweeperPvP.Hubs
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
-            RoomConnections.AddOrUpdate(roomId, _ 
-                => new List<string> { Context.ConnectionId }, 
+            RoomConnections.AddOrUpdate(roomId, _
+                => new List<string> { Context.ConnectionId },
                 (_, existing) =>
-            {
-                if (!existing.Contains(Context.ConnectionId)) 
-                    existing.Add(Context.ConnectionId);
-                return existing;
-            });
+                {
+                    if (!existing.Contains(Context.ConnectionId))
+                        existing.Add(Context.ConnectionId);
+                    return existing;
+                });
 
             int count = RoomConnections[roomId].Count;
-
-            // Gửi player number cho người mới vào
             await Clients.Caller.SendAsync("AssignPlayerNumber", count);
-
             await Clients.Group(roomId).SendAsync("PlayerJoined", count);
-
-            //await Clients.Group(roomId).SendAsync("PlayerJoined", RoomConnections[roomId].Count);
         }
 
         public Task LeaveRoom(string roomId)
@@ -58,7 +60,6 @@ namespace MineSweeperPvP.Hubs
             return Task.CompletedTask;
         }
 
-        // When game starts, store the boards
         public async Task StartGame(string roomId, string player1BoardJson, string player2BoardJson)
         {
             var boards = new GameBoards
@@ -68,22 +69,21 @@ namespace MineSweeperPvP.Hubs
             };
 
             RoomBoards.AddOrUpdate(roomId, boards, (_, __) => boards);
-
-            // Send boards to both players
-            //await Clients.Group(roomId).SendAsync("GameStarted", player1BoardJson, player2BoardJson);
             await Clients.GroupExcept(roomId, Context.ConnectionId).SendAsync("GameStarted", player1BoardJson, player2BoardJson);
         }
 
-        // When a player clicks a cell, broadcast to the other player
         public async Task CellClicked(string roomId, int playerNumber, int row, int col, bool isBomb, int adjacent)
         {
             await Clients.OthersInGroup(roomId).SendAsync("OpponentCellClicked", playerNumber, row, col, isBomb, adjacent);
         }
 
-        // When a player's grid needs to be reset (hit a bomb)
+        public async Task FlagChanged(string roomId, int playerNumber, int row, int col, bool flagged)
+        {
+            await Clients.OthersInGroup(roomId).SendAsync("FlagChanged", playerNumber, row, col, flagged);
+        }
+
         public async Task GridReset(string roomId, int playerNumber, string newBoardJson)
         {
-            // Update stored board
             if (RoomBoards.TryGetValue(roomId, out var boards))
             {
                 if (playerNumber == 1)
@@ -95,10 +95,32 @@ namespace MineSweeperPvP.Hubs
             await Clients.Group(roomId).SendAsync("PlayerGridReset", playerNumber, newBoardJson);
         }
 
-        // When a player finishes their grid (revealed all safe cells)
+        // ✅ Lưu kết quả khi có người thắng
         public async Task PlayerFinished(string roomId, int playerNumber)
         {
-            await Clients.Group(roomId).SendAsync("PlayerFinished", playerNumber);
+            try
+            {
+                // Lưu vào database
+                var matchHistory = new MatchHistory
+                {
+                    RoomId = roomId,
+                    Result = $"P{playerNumber}", // "P1" hoặc "P2"
+                    MatchCreateDay = DateTime.UtcNow
+                };
+
+                _db.MatchHistories.Add(matchHistory);
+                await _db.SaveChangesAsync();
+
+                // Thông báo cho tất cả người chơi
+                await Clients.Group(roomId).SendAsync("PlayerFinished", playerNumber);
+            }
+            catch (Exception ex)
+            {
+                // Log error nếu cần
+                Console.WriteLine($"Error saving match history: {ex.Message}");
+                // Vẫn thông báo kết quả cho người chơi
+                await Clients.Group(roomId).SendAsync("PlayerFinished", playerNumber);
+            }
         }
 
         public Task SendMessageToRoom(string roomId, string message)
